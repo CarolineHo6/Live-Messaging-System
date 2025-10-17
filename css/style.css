@@ -1,0 +1,26 @@
+p{
+    color:white;
+    background:red;
+    font-style:italic;
+}
+
+/* for ids (ids should be unique) */
+#box{
+    width:100px;
+    height:150px;
+    background:green;
+}
+
+/* for classes */
+.box{
+    width:50px;
+    height:50px;
+    background:red;
+    margin:10px;
+    padding:10px;
+    border:2px solid red;
+    /* put boxes side by side */
+    /* float:left; */
+    /* Position (relative (default), absolute (set coords for corner) */
+    position:relative;
+}
