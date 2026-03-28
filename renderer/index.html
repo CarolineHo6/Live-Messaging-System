@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-eval' https://js.pusher.com; connect-src 'self' http://localhost:3000 https://sockjs.pusher.com https://ws-us2.pusher.com; style-src 'self';">
+    <title>Chat App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="auth-section">
+        <h2 id="auth-title">Login</h2>
+        <input id="auth-username" placeholder="Username" />
+        <input id="auth-password" type="password" placeholder="Password" />
+        <input id="auth-confirm" type="password" placeholder="Confirm Password" style="display: none;" />
+        <button id="auth-submit">Done</button>
+        <p id="auth-switch">Don't have an account? <a href="#" id="switch-link">Create one</a></p>
+    </div>
+
+    <div id="app" style="display: none;">
+        <div id="sidebar">
+            <h3>Rooms</h3>
+            <div id="room-list"></div>
+            <button id="open-create-room">+ New Room</button>
+        </div>
+        <div id="main">
+            <div id="chat-header">
+                <h2 id="room-title">Select a room</h2>
+                <span id="user-display"></span>
+            </div>
+            <div id="messages"></div>
+            <div id="input-container">
+                <input id="input" placeholder="Type message..." disabled />
+                <button id="sendBtn" disabled>Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-room-modal" class="modal">
+        <div class="modal-content">
+            <h2>Create Room</h2>
+            <input id="room-name-input" placeholder="Room name (optional)" />
+            <p>Add members:</p>
+            <div id="user-boxes"></div>
+            <div class="modal-buttons">
+                <button id="cancel-create-room">Cancel</button>
+                <button id="confirm-create-room">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="context-menu" class="modal">
+        <div class="context-content" id="room-context">
+            <button id="hide-chat-btn">Hide Chat</button>
+            <button id="unhide-chat-btn" style="display: none;">Unhide Chat</button>
+        </div>
+        <div class="context-content" id="message-context">
+            <button id="hide-message-btn">Hide Message</button>
+            <button id="unhide-message-btn" style="display: none;">Unhide Message</button>
+        </div>
+    </div>
+
+    <script src="auth/auth.js"></script>
+    <script src="renderer.js"></script>
+</body>
+
+</html>
