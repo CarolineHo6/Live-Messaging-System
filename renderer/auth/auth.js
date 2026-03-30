@@ -57,7 +57,8 @@ async function handleSignup() {
     const res = await fetch('http://localhost:3000/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: usernameVal, password })
+        body: JSON.stringify({ username: usernameVal, password }),
+        credentials: 'include'
     });
 
     const data = await res.json();
@@ -86,7 +87,8 @@ async function handleLogin() {
     const res = await fetch('http://localhost:3000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: usernameVal, password })
+        body: JSON.stringify({ username: usernameVal, password }),
+        credentials: 'include'
     });
 
     const data = await res.json();

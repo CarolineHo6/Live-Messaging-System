@@ -28,8 +28,12 @@ function setCurrentRoom(room) {
 window.getCurrentRoom = getCurrentRoom;
 
 async function loadRooms() {
-    const username = window.getUsername();
-    const res = await fetch('http://localhost:3000/rooms?user=' + encodeURIComponent(username));
+    const res = await fetch('http://localhost:3000/rooms', { credentials: 'include' });
+    if (res.status === 401) {
+        document.getElementById('auth-section').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+        return;
+    }
     const rooms = await res.json();
     const roomList = document.getElementById('room-list');
     roomList.innerHTML = '';
@@ -58,7 +62,8 @@ async function createRoom(name, members, isDirect) {
     const res = await fetch('http://localhost:3000/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, members, isDirect })
+        body: JSON.stringify({ name, members, isDirect }),
+        credentials: 'include'
     });
 
     const room = await res.json();
@@ -80,7 +85,7 @@ function closeModal() {
 let selectedUsers = [];
 
 async function loadUsersForRoom() {
-    const res = await fetch('http://localhost:3000/users');
+    const res = await fetch('http://localhost:3000/users', { credentials: 'include' });
     const users = await res.json();
     const username = window.getUsername();
     selectedUsers = [];
@@ -182,11 +187,11 @@ document.addEventListener('click', function() {
 
 document.getElementById('hide-chat-btn').addEventListener('click', async function() {
     if (contextMenuTarget && contextMenuTarget.type === 'room') {
-        const username = window.getUsername();
         await fetch('http://localhost:3000/hide-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, room: contextMenuTarget.name })
+            body: JSON.stringify({ room: contextMenuTarget.name }),
+            credentials: 'include'
         });
         loadRooms();
     }
@@ -195,11 +200,11 @@ document.getElementById('hide-chat-btn').addEventListener('click', async functio
 
 document.getElementById('hide-message-btn').addEventListener('click', async function() {
     if (contextMenuTarget && contextMenuTarget.type === 'message') {
-        const username = window.getUsername();
         await fetch('http://localhost:3000/hide-message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, room: currentRoom, messageId: contextMenuTarget.id })
+            body: JSON.stringify({ room: currentRoom, messageId: contextMenuTarget.id }),
+            credentials: 'include'
         });
         loadMessages(currentRoom);
     }
@@ -228,8 +233,7 @@ function addMessageToUI(sender, text, time, messageId) {
 }
 
 async function loadMessages(room) {
-    const username = window.getUsername();
-    const res = await fetch('http://localhost:3000/messages?room=' + encodeURIComponent(room) + '&user=' + encodeURIComponent(username));
+    const res = await fetch('http://localhost:3000/messages?room=' + encodeURIComponent(room), { credentials: 'include' });
     const messages = await res.json();
     messagesDiv.innerHTML = '';
 
@@ -242,14 +246,14 @@ function sendMessage() {
     const input = document.getElementById('input');
     const message = input.value.trim();
     const room = getCurrentRoom();
-    const user = window.getUsername();
 
     if (!message || !room) return;
 
     fetch('http://localhost:3000/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message, room: room, sender: user })
+        body: JSON.stringify({ message: message, room: room }),
+        credentials: 'include'
     });
 
     input.value = '';
