@@ -1,18 +1,19 @@
 require('dotenv').config();
 const express = require('express');
-const Pusher = require('pusher');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 const { MongoClient } = require('mongodb');
 const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(express.json());
 
-const pusher = new Pusher({
-    appId: process.env.PUSHER_APP_ID,
-    key: process.env.PUSHER_APP_KEY,
-    secret: process.env.PUSHER_APP_SECRET,
-    cluster: process.env.PUSHER_CLUSTER,
-    useTLS: true
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
 });
 
 const mongoUri = process.env.MONGO_URI;
@@ -81,7 +82,7 @@ app.post('/rooms', async (req, res) => {
         const room = { name: otherUser, members, isDirect: true, createdAt: new Date() };
         await db.collection('rooms').insertOne(room);
 
-        pusher.trigger('rooms-channel', 'room-created', room);
+        io.emit('room-created', room);
 
         return res.json(room);
     }
@@ -94,7 +95,7 @@ app.post('/rooms', async (req, res) => {
     const room = { name, members, isDirect: false, createdAt: new Date() };
     await db.collection('rooms').insertOne(room);
 
-    pusher.trigger('rooms-channel', 'room-created', room);
+    io.emit('room-created', room);
 
     res.json(room);
 });
@@ -146,7 +147,7 @@ app.post('/message', async (req, res) => {
 
     await db.collection('messages').insertOne(messageDoc);
 
-    pusher.trigger(`chat-room-${room.replace(/[^a-zA-Z0-9,-]/g, '-')}`, 'new-message', messageDoc);
+    io.to(room).emit('new-message', messageDoc);
 
     res.sendStatus(200);
 });
@@ -189,7 +190,25 @@ app.post('/unhide-message', async (req, res) => {
     res.sendStatus(200);
 });
 
-app.listen(3000, async () => {
+io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+
+    socket.on('join-room', (room) => {
+        socket.join(room);
+        console.log(`Socket ${socket.id} joined room: ${room}`);
+    });
+
+    socket.on('leave-room', (room) => {
+        socket.leave(room);
+        console.log(`Socket ${socket.id} left room: ${room}`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+    });
+});
+
+httpServer.listen(3000, async () => {
     await connectDB();
     console.log('Backend running on http://localhost:3000');
 });
