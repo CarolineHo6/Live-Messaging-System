@@ -1,26 +1,19 @@
-const Pusher = require('pusher-js');
+const { io } = require('socket.io-client');
 
-const key = process.env.PUSHER_APP_KEY;
-const cluster = process.env.PUSHER_CLUSTER;
+const socket = io('http://localhost:3000');
 
-const pusher = new Pusher(key, {
-    cluster: cluster
-});
-
-window.pusher = pusher;
+window.socket = socket;
 window.currentChannel = null;
 window.currentUsername = '';
 
 function subscribeToRooms() {
-    const roomsChannel = pusher.subscribe('rooms-channel');
-    roomsChannel.bind('room-created', function(room) {
+    socket.on('room-created', function(room) {
         loadRooms();
     });
 }
 
 window.subscribeToRooms = subscribeToRooms;
 
-// Chat - Rooms
 let currentRoom = null;
 
 function getCurrentRoom() {
@@ -131,16 +124,19 @@ function handleCreateRoom() {
 
 function joinRoom(room) {
     if (window.currentChannel) {
-        window.pusher.unsubscribe(window.currentChannel);
+        socket.emit('leave-room', window.currentChannel);
     }
 
     setCurrentRoom(room);
-    const channelName = 'chat-room-' + room.replace(/[^a-zA-Z0-9,-]/g, '-');
-    window.currentChannel = channelName;
-    const channel = window.pusher.subscribe(channelName);
+    window.currentChannel = room;
 
-    channel.bind('new-message', function(data) {
-        addMessageToUI(data.sender, data.message, data.timestamp, data._id);
+    socket.emit('join-room', room);
+
+    socket.off('new-message');
+    socket.on('new-message', function(data) {
+        if (data.room === room) {
+            addMessageToUI(data.sender, data.message, data.timestamp, data._id);
+        }
     });
 
     loadMessages(room);
@@ -149,7 +145,6 @@ function joinRoom(room) {
     loadRooms();
 }
 
-// Context Menu
 let contextMenuTarget = null;
 
 function showRoomContextMenu(e, roomName) {
@@ -211,7 +206,6 @@ document.getElementById('hide-message-btn').addEventListener('click', async func
     hideContextMenu();
 });
 
-// Chat - Messages
 const messagesDiv = document.getElementById('messages');
 
 function formatTime(date) {
@@ -261,7 +255,6 @@ function sendMessage() {
     input.value = '';
 }
 
-// Initialize
 window.initAuth();
 document.getElementById('auth-submit').addEventListener('click', window.handleAuthSubmit);
 
