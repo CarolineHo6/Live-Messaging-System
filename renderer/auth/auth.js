@@ -1,4 +1,5 @@
 let isSignupMode = false;
+const API_URL = window.location.origin;
 
 function getIsSignupMode() {
     return isSignupMode;
@@ -54,7 +55,7 @@ async function handleSignup() {
         return;
     }
 
-    const res = await fetch('http://localhost:3000/signup', {
+    const res = await fetch('API_URL/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: usernameVal, password }),
@@ -84,7 +85,7 @@ async function handleLogin() {
         return;
     }
 
-    const res = await fetch('http://localhost:3000/login', {
+    const res = await fetch('API_URL/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: usernameVal, password }),

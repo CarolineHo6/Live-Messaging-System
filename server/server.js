@@ -8,35 +8,102 @@ const { Server } = require('socket.io');
 const { MongoClient } = require('mongodb');
 const bcrypt = require('bcryptjs');
 const xss = require('xss');
+const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
-app.use(helmet());
-app.use(express.json());
+const isProduction = process.env.NODE_ENV === 'production';
+
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const allowedOrigins = isProduction 
+    ? [process.env.FRONTEND_URL] 
+    : frontendUrl.split(',');
+
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            connectSrc: ["'self'", ...allowedOrigins, "ws:", "wss:"],
+            scriptSrc: ["'self'", "'unsafe-eval'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            upgradeInsecureRequests: isProduction ? [] : null
+        }
+    },
+    crossOriginEmbedderPolicy: false
+}));
+app.use(express.json({ limit: '10kb' }));
+
+if (!isProduction) {
+    const cors = require('cors');
+    app.use(cors({ origin: frontendUrl.split(','), credentials: true }));
+} else {
+    app.use(express.static(path.join(__dirname, '../renderer')));
+}
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+        origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    maxHttpBufferSize: 1e6
 });
 
 const mongoUri = process.env.MONGO_URI;
-const client = new MongoClient(mongoUri);
+if (!mongoUri) {
+    console.error('MONGO_URI is required');
+    process.exit(1);
+}
+const client = new MongoClient(mongoUri, {
+    maxPoolSize: 20,
+    minPoolSize: 5
+});
 let db;
 
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: false,
+        secure: isProduction,
         httpOnly: true,
+        sameSite: 'strict',
         maxAge: 24 * 60 * 60 * 1000
     }
 });
 
+if (!process.env.SESSION_SECRET) {
+    console.error('SESSION_SECRET is required in production');
+    process.exit(1);
+}
+
 app.use(sessionMiddleware);
+
+const csrfTokens = new Map();
+const CSRF_TOKEN_EXPIRY = 60 * 60 * 1000;
+
+app.get('/csrf-token', (req, res) => {
+    const existingToken = csrfTokens.get(req.session.id);
+    if (existingToken && existingToken.expiresAt > Date.now()) {
+        return res.json({ csrfToken: existingToken.token });
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    csrfTokens.set(req.session.id, { token, expiresAt: Date.now() + CSRF_TOKEN_EXPIRY });
+    res.json({ csrfToken: token });
+});
+
+function validateCsrf(req, res, next) {
+    const csrfToken = req.headers['x-csrf-token'] || req.body._csrf;
+    const stored = csrfTokens.get(req.session.id);
+    if (!stored || stored.token !== csrfToken || stored.expiresAt < Date.now()) {
+        return res.status(403).json({ error: 'Invalid CSRF token' });
+    }
+    next();
+}
+
 io.use((socket, next) => {
     sessionMiddleware(socket.request, {}, next);
 });
@@ -44,21 +111,33 @@ io.use((socket, next) => {
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
-    message: { error: 'Too many login attempts, please try again later.' }
+    message: { error: 'Too many login attempts, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false
 });
 
 const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 60,
-    message: { error: 'Too many requests, please slow down.' }
+    message: { error: 'Too many requests, please slow down.' },
+    standardHeaders: true,
+    legacyHeaders: false
 });
 
 app.use('/api/', apiLimiter);
 
 async function connectDB() {
-    await client.connect();
-    db = client.db('chat_app');
-    console.log('Connected to MongoDB');
+    try {
+        await client.connect();
+        db = client.db('chat_app');
+        await db.collection('users').createIndex({ username: 1 }, { unique: true });
+        await db.collection('rooms').createIndex({ name: 1 }, { unique: true });
+        await db.collection('messages').createIndex({ room: 1, timestamp: -1 });
+        console.log('Connected to MongoDB');
+    } catch (err) {
+        console.error('Failed to connect to MongoDB:', err);
+        process.exit(1);
+    }
 }
 
 function sanitize(str) {
@@ -270,6 +349,10 @@ app.post('/message', requireAuth, async (req, res) => {
         return res.status(400).json({ error: 'Message and room required' });
     }
 
+    if (typeof message !== 'string' || message.length > 5000) {
+        return res.status(400).json({ error: 'Message too long (max 5000 characters)' });
+    }
+
     const sanitizedMessage = sanitize(message);
     const sanitizedRoom = sanitize(room);
     const timestamp = new Date();
@@ -364,7 +447,18 @@ io.on('connection', (socket) => {
     });
 });
 
+httpServer.on('error', (err) => {
+    console.error('Server error:', err);
+    if (err.code === 'EADDRINUSE') {
+        console.error('Port 3000 is already in use');
+    }
+});
+
 httpServer.listen(3000, async () => {
     await connectDB();
-    console.log('Backend running on http://localhost:3000');
+    const protocol = isProduction ? 'https' : 'http';
+    console.log(`Backend running on ${protocol}://localhost:3000`);
+    if (!isProduction) {
+        console.log('WARNING: Running in development mode - set NODE_ENV=production for production');
+    }
 });

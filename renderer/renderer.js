@@ -1,10 +1,13 @@
 const { io } = require('socket.io-client');
 
-const socket = io('http://localhost:3000');
+const API_URL = window.location.origin;
+const socket = io(API_URL, { withCredentials: true });
 
 window.socket = socket;
 window.currentChannel = null;
 window.currentUsername = '';
+
+const API_BASE = API_URL;
 
 function subscribeToRooms() {
     socket.on('room-created', function(room) {
@@ -27,8 +30,10 @@ function setCurrentRoom(room) {
 
 window.getCurrentRoom = getCurrentRoom;
 
+const API_URL = window.location.origin;
+
 async function loadRooms() {
-    const res = await fetch('http://localhost:3000/rooms', { credentials: 'include' });
+    const res = await fetch(API_URL + '/rooms', { credentials: 'include' });
     if (res.status === 401) {
         document.getElementById('auth-section').style.display = 'flex';
         document.getElementById('app').style.display = 'none';
@@ -59,7 +64,7 @@ async function loadRooms() {
 window.loadRooms = loadRooms;
 
 async function createRoom(name, members, isDirect) {
-    const res = await fetch('http://localhost:3000/rooms', {
+    const res = await fetch(API_URL + '/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, members, isDirect }),
@@ -85,7 +90,7 @@ function closeModal() {
 let selectedUsers = [];
 
 async function loadUsersForRoom() {
-    const res = await fetch('http://localhost:3000/users', { credentials: 'include' });
+    const res = await fetch(API_BASE/users', { credentials: 'include' });
     const users = await res.json();
     const username = window.getUsername();
     selectedUsers = [];
@@ -187,7 +192,7 @@ document.addEventListener('click', function() {
 
 document.getElementById('hide-chat-btn').addEventListener('click', async function() {
     if (contextMenuTarget && contextMenuTarget.type === 'room') {
-        await fetch('http://localhost:3000/hide-chat', {
+        await fetch(API_BASE/hide-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ room: contextMenuTarget.name }),
@@ -200,7 +205,7 @@ document.getElementById('hide-chat-btn').addEventListener('click', async functio
 
 document.getElementById('hide-message-btn').addEventListener('click', async function() {
     if (contextMenuTarget && contextMenuTarget.type === 'message') {
-        await fetch('http://localhost:3000/hide-message', {
+        await fetch(API_BASE/hide-message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ room: currentRoom, messageId: contextMenuTarget.id }),
@@ -233,7 +238,7 @@ function addMessageToUI(sender, text, time, messageId) {
 }
 
 async function loadMessages(room) {
-    const res = await fetch('http://localhost:3000/messages?room=' + encodeURIComponent(room), { credentials: 'include' });
+    const res = await fetch(API_BASE/messages?room=' + encodeURIComponent(room), { credentials: 'include' });
     const messages = await res.json();
     messagesDiv.innerHTML = '';
 
@@ -249,7 +254,7 @@ function sendMessage() {
 
     if (!message || !room) return;
 
-    fetch('http://localhost:3000/message', {
+    fetch(API_BASE/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: message, room: room }),
