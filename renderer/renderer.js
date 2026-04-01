@@ -30,8 +30,6 @@ function setCurrentRoom(room) {
 
 window.getCurrentRoom = getCurrentRoom;
 
-const API_URL = window.location.origin;
-
 async function loadRooms() {
     const res = await fetch(API_URL + '/rooms', { credentials: 'include' });
     if (res.status === 401) {
@@ -90,7 +88,7 @@ function closeModal() {
 let selectedUsers = [];
 
 async function loadUsersForRoom() {
-    const res = await fetch(API_BASE/users', { credentials: 'include' });
+    const res = await fetch(API_BASE + '/users', { credentials: 'include' });
     const users = await res.json();
     const username = window.getUsername();
     selectedUsers = [];
@@ -192,7 +190,7 @@ document.addEventListener('click', function() {
 
 document.getElementById('hide-chat-btn').addEventListener('click', async function() {
     if (contextMenuTarget && contextMenuTarget.type === 'room') {
-        await fetch(API_BASE/hide-chat', {
+        await fetch(API_BASE + '/hide-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ room: contextMenuTarget.name }),
@@ -205,7 +203,7 @@ document.getElementById('hide-chat-btn').addEventListener('click', async functio
 
 document.getElementById('hide-message-btn').addEventListener('click', async function() {
     if (contextMenuTarget && contextMenuTarget.type === 'message') {
-        await fetch(API_BASE/hide-message', {
+        await fetch(API_BASE + '/hide-message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ room: currentRoom, messageId: contextMenuTarget.id }),
@@ -238,7 +236,7 @@ function addMessageToUI(sender, text, time, messageId) {
 }
 
 async function loadMessages(room) {
-    const res = await fetch(API_BASE/messages?room=' + encodeURIComponent(room), { credentials: 'include' });
+    const res = await fetch(API_BASE + '/messages?room=' + encodeURIComponent(room), { credentials: 'include' });
     const messages = await res.json();
     messagesDiv.innerHTML = '';
 
@@ -254,7 +252,7 @@ function sendMessage() {
 
     if (!message || !room) return;
 
-    fetch(API_BASE/message', {
+    fetch(API_BASE + '/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: message, room: room }),
