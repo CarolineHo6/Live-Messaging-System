@@ -421,6 +421,33 @@ app.post('/unhide-message', requireAuth, async (req, res) => {
 });
 
 const userSockets = new Map();
+const typingUsers = new Map();
+const TYPING_TIMEOUT = 3000;
+
+function setUserTyping(room, username) {
+    const key = room;
+    if (!typingUsers.has(key)) {
+        typingUsers.set(key, new Map());
+    }
+    const roomTyping = typingUsers.get(key);
+    roomTyping.set(username, Date.now());
+    
+    setTimeout(() => {
+        const currentTyping = typingUsers.get(key);
+        if (currentTyping && currentTyping.get(username) === roomTyping.get(username)) {
+            currentTyping.delete(username);
+            if (currentTyping.size === 0) {
+                typingUsers.delete(key);
+            }
+        }
+    }, TYPING_TIMEOUT);
+}
+
+function getTypingUsers(room) {
+    const roomTyping = typingUsers.get(room);
+    if (!roomTyping) return [];
+    return Array.from(roomTyping.keys());
+}
 
 io.on('connection', (socket) => {
     const username = socket.request.session?.userId;
@@ -438,6 +465,28 @@ io.on('connection', (socket) => {
 
     socket.on('leave-room', (room) => {
         socket.leave(sanitize(room));
+        const roomTyping = typingUsers.get(room);
+        if (roomTyping) {
+            roomTyping.delete(username);
+            io.to(room).emit('typing-update', getTypingUsers(room));
+        }
+    });
+
+    socket.on('typing', (room) => {
+        if (!username) return;
+        const sanitizedRoom = sanitize(room);
+        setUserTyping(sanitizedRoom, username);
+        socket.to(sanitizedRoom).emit('typing-update', getTypingUsers(sanitizedRoom));
+    });
+
+    socket.on('stop-typing', (room) => {
+        if (!username) return;
+        const sanitizedRoom = sanitize(room);
+        const roomTyping = typingUsers.get(sanitizedRoom);
+        if (roomTyping) {
+            roomTyping.delete(username);
+            io.to(sanitizedRoom).emit('typing-update', getTypingUsers(sanitizedRoom));
+        }
     });
 
     socket.on('disconnect', () => {

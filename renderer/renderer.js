@@ -9,6 +9,10 @@ window.currentUsername = '';
 
 const API_BASE = API_URL;
 
+let typingTimeout = null;
+let isTyping = false;
+let typingUsers = [];
+
 function subscribeToRooms() {
     socket.on('room-created', function(room) {
         loadRooms();
@@ -133,6 +137,10 @@ function handleCreateRoom() {
 function joinRoom(room) {
     if (window.currentChannel) {
         socket.emit('leave-room', window.currentChannel);
+        if (isTyping) {
+            socket.emit('stop-typing', window.currentChannel);
+            isTyping = false;
+        }
     }
 
     setCurrentRoom(room);
@@ -147,10 +155,17 @@ function joinRoom(room) {
         }
     });
 
+    socket.off('typing-update');
+    socket.on('typing-update', function(usernames) {
+        typingUsers = usernames.filter(u => u !== window.getUsername());
+        updateTypingIndicator();
+    });
+
     loadMessages(room);
     document.getElementById('input').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     loadRooms();
+    updateTypingIndicator();
 }
 
 let contextMenuTarget = null;
@@ -252,6 +267,15 @@ function sendMessage() {
 
     if (!message || !room) return;
 
+    if (isTyping) {
+        socket.emit('stop-typing', room);
+        isTyping = false;
+    }
+    if (typingTimeout) {
+        clearTimeout(typingTimeout);
+        typingTimeout = null;
+    }
+
     fetch(API_BASE + '/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -260,6 +284,49 @@ function sendMessage() {
     });
 
     input.value = '';
+}
+
+function handleTyping() {
+    const room = getCurrentRoom();
+    if (!room) return;
+
+    if (!isTyping) {
+        socket.emit('typing', room);
+        isTyping = true;
+    }
+
+    if (typingTimeout) {
+        clearTimeout(typingTimeout);
+    }
+
+    typingTimeout = setTimeout(() => {
+        if (isTyping) {
+            socket.emit('stop-typing', room);
+            isTyping = false;
+        }
+        typingTimeout = null;
+    }, 3000);
+}
+
+function updateTypingIndicator() {
+    let indicator = document.getElementById('typing-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'typing-indicator';
+        indicator.style.cssText = 'padding: 5px 10px; font-size: 0.85em; color: #666; font-style: italic; height: 24px;';
+        const messagesDiv = document.getElementById('messages');
+        messagesDiv.parentNode.insertBefore(indicator, messagesDiv.nextSibling);
+    }
+
+    if (typingUsers.length === 0) {
+        indicator.textContent = '';
+    } else if (typingUsers.length === 1) {
+        indicator.textContent = typingUsers[0] + ' is typing...';
+    } else if (typingUsers.length === 2) {
+        indicator.textContent = typingUsers[0] + ' and ' + typingUsers[1] + ' are typing...';
+    } else {
+        indicator.textContent = typingUsers.length + ' people are typing...';
+    }
 }
 
 window.initAuth();
@@ -283,3 +350,4 @@ document.getElementById('sendBtn').addEventListener('click', sendMessage);
 document.getElementById('input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') sendMessage();
 });
+document.getElementById('input').addEventListener('input', handleTyping);
