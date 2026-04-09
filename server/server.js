@@ -133,6 +133,8 @@ async function connectDB() {
         await db.collection('users').createIndex({ username: 1 }, { unique: true });
         await db.collection('rooms').createIndex({ name: 1 }, { unique: true });
         await db.collection('messages').createIndex({ room: 1, timestamp: -1 });
+        await db.collection('friends').createIndex({ user: 1 });
+        await db.collection('friend_requests').createIndex({ to: 1, from: 1 }, { unique: true });
         console.log('Connected to MongoDB');
     } catch (err) {
         console.error('Failed to connect to MongoDB:', err);
@@ -214,6 +216,68 @@ app.post('/logout', (req, res) => {
     res.json({ success: true });
 });
 
+const passwordResetCodes = new Map();
+const RESET_CODE_EXPIRY = 15 * 60 * 1000;
+
+app.post('/forgot-password', async (req, res) => {
+    const { username } = req.body;
+
+    if (!username) {
+        return res.status(400).json({ error: 'Username required' });
+    }
+
+    const user = await db.collection('users').findOne({ username: sanitize(username) });
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    passwordResetCodes.set(sanitize(username), {
+        code,
+        expiresAt: Date.now() + RESET_CODE_EXPIRY
+    });
+
+    console.log('Password reset code for ' + username + ': ' + code);
+
+    res.json({ success: true, message: 'Reset code sent to your email (code logged for demo)' });
+});
+
+app.post('/reset-password', async (req, res) => {
+    const { username, code, newPassword } = req.body;
+
+    if (!username || !code || !newPassword) {
+        return res.status(400).json({ error: 'Username, code, and new password required' });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const stored = passwordResetCodes.get(sanitize(username));
+    if (!stored) {
+        return res.status(400).json({ error: 'No reset code requested for this user' });
+    }
+
+    if (stored.expiresAt < Date.now()) {
+        passwordResetCodes.delete(sanitize(username));
+        return res.status(400).json({ error: 'Reset code expired' });
+    }
+
+    if (stored.code !== code) {
+        return res.status(400).json({ error: 'Invalid reset code' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await db.collection('users').updateOne(
+        { username: sanitize(username) },
+        { $set: { password: hashedPassword } }
+    );
+
+    passwordResetCodes.delete(sanitize(username));
+
+    res.json({ success: true, message: 'Password reset successful' });
+});
+
 app.get('/me', (req, res) => {
     if (req.session.userId) {
         res.json({ username: req.session.userId });
@@ -238,6 +302,14 @@ app.post('/rooms', requireAuth, async (req, res) => {
         
         if (currentUser !== username) {
             return res.status(403).json({ error: 'Cannot create DM for another user' });
+        }
+
+        const areFriends = await db.collection('friends').findOne({
+            username: currentUser,
+            friends: otherUser
+        });
+        if (!areFriends) {
+            return res.status(403).json({ error: 'Must be friends to message' });
         }
 
         const existing = await db.collection('rooms').findOne({ 
@@ -418,6 +490,127 @@ app.post('/unhide-message', requireAuth, async (req, res) => {
     );
 
     res.sendStatus(200);
+});
+
+app.get('/friends', requireAuth, async (req, res) => {
+    const username = req.session.userId;
+    const friends = await db.collection('friends').findOne({ username });
+    res.json(friends ? friends.friends : []);
+});
+
+app.get('/friend-requests', requireAuth, async (req, res) => {
+    const username = req.session.userId;
+    const requests = await db.collection('friend_requests').find({ to: username }).toArray();
+    res.json(requests);
+});
+
+app.post('/friend-request', requireAuth, async (req, res) => {
+    const { to } = req.body;
+    const from = req.session.userId;
+
+    if (!to) {
+        return res.status(400).json({ error: 'Recipient required' });
+    }
+
+    if (from === to) {
+        return res.status(400).json({ error: 'Cannot send friend request to yourself' });
+    }
+
+    const targetUser = await db.collection('users').findOne({ username: sanitize(to) });
+    if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    const existingFriends = await db.collection('friends').findOne({ 
+        username: from, 
+        friends: sanitize(to) 
+    });
+    if (existingFriends) {
+        return res.status(400).json({ error: 'Already friends' });
+    }
+
+    const existingRequest = await db.collection('friend_requests').findOne({ 
+        $or: [
+            { from: from, to: sanitize(to) },
+            { from: sanitize(to), to: from }
+        ]
+    });
+    if (existingRequest) {
+        return res.status(400).json({ error: 'Friend request already exists' });
+    }
+
+    await db.collection('friend_requests').insertOne({
+        from,
+        to: sanitize(to),
+        createdAt: new Date()
+    });
+
+    const targetSocket = userSockets.get(sanitize(to));
+    if (targetSocket) {
+        io.to(targetSocket).emit('friend-request-received', { from });
+    }
+
+    res.json({ success: true });
+});
+
+app.post('/friend-request/accept', requireAuth, async (req, res) => {
+    const { from } = req.body;
+    const username = req.session.userId;
+
+    if (!from) {
+        return res.status(400).json({ error: 'Sender required' });
+    }
+
+    const request = await db.collection('friend_requests').findOne({
+        from: sanitize(from),
+        to: username
+    });
+
+    if (!request) {
+        return res.status(404).json({ error: 'Friend request not found' });
+    }
+
+    await db.collection('friend_requests').deleteOne({ _id: request._id });
+
+    await db.collection('friends').updateOne(
+        { username },
+        { $addToSet: { friends: sanitize(from) } },
+        { upsert: true }
+    );
+    await db.collection('friends').updateOne(
+        { username: sanitize(from) },
+        { $addToSet: { friends: username } },
+        { upsert: true }
+    );
+
+    const targetSocket = userSockets.get(sanitize(from));
+    if (targetSocket) {
+        io.to(targetSocket).emit('friend-accepted', { username });
+    }
+
+    res.json({ success: true });
+});
+
+app.post('/friend-request/reject', requireAuth, async (req, res) => {
+    const { from } = req.body;
+    const username = req.session.userId;
+
+    if (!from) {
+        return res.status(400).json({ error: 'Sender required' });
+    }
+
+    const request = await db.collection('friend_requests').findOne({
+        from: sanitize(from),
+        to: username
+    });
+
+    if (!request) {
+        return res.status(404).json({ error: 'Friend request not found' });
+    }
+
+    await db.collection('friend_requests').deleteOne({ _id: request._id });
+
+    res.json({ success: true });
 });
 
 const userSockets = new Map();

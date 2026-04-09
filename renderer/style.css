@@ -14,7 +14,6 @@ body { font-family: Arial, sans-serif; }
 #auth-section button { padding: 10px 20px; }
 #auth-section h2 { margin-bottom: 10px; }
 #auth-section p { margin-top: 10px; font-size: 14px; }
-
 #app {
     display: flex;
     height: 100vh;
@@ -140,3 +139,41 @@ body { font-family: Arial, sans-serif; }
 .context-content button:hover {
     background: #f0f0f0;
 }
+
+#friends-tab-btn {
+    padding: 10px;
+    background: #28a745;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    width: 100%;
+}
+#friends-tab-btn:hover { background: #218838; }
+
+#friend-requests-section, #friends-list-section {
+    margin-bottom: 20px;
+}
+#friend-requests-section h3, #friends-list-section h3 {
+    margin-bottom: 10px;
+    font-size: 16px;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+}
+#friend-requests-list, #friends-list {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 5px;
+}
+
+#add-friend-btn {
+    background: #0066cc;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#add-friend-btn:hover { background: #0055aa; }

@@ -17,10 +17,12 @@
         <input id="auth-confirm" type="password" placeholder="Confirm Password" style="display: none;" />
         <button id="auth-submit">Done</button>
         <p id="auth-switch">Don't have an account? <a href="#" id="switch-link">Create one</a></p>
+        <p id="forgot-password"><a href="#" id="forgot-password-link">Forgot Password?</a></p>
     </div>
 
     <div id="app" style="display: none;">
         <div id="sidebar">
+            <button id="friends-tab-btn">Friends</button>
             <h3>Rooms</h3>
             <div id="room-list"></div>
             <button id="open-create-room">+ New Room</button>
@@ -59,6 +61,51 @@
         <div class="context-content" id="message-context">
             <button id="hide-message-btn">Hide Message</button>
             <button id="unhide-message-btn" style="display: none;">Unhide Message</button>
+        </div>
+    </div>
+
+    <div id="friends-panel" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <h2>Friends</h2>
+            <div id="friend-requests-section">
+                <h3>Friend Requests</h3>
+                <div id="friend-requests-list"></div>
+            </div>
+            <div id="friends-list-section">
+                <h3>Your Friends</h3>
+                <div id="friends-list"></div>
+            </div>
+            <div class="modal-buttons">
+                <button id="add-friend-btn">Add Friend</button>
+                <button id="close-friends-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-friend-modal" class="modal">
+        <div class="modal-content">
+            <h2>Add Friend</h2>
+            <input id="friend-username-input" placeholder="Enter username" />
+            <div class="modal-buttons">
+                <button id="cancel-add-friend">Cancel</button>
+                <button id="confirm-add-friend">Send Request</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="forgot-password-modal" class="modal">
+        <div class="modal-content">
+            <h2>Reset Password</h2>
+            <input id="reset-username" placeholder="Username" />
+            <input id="reset-code" placeholder="Reset Code" />
+            <input id="reset-new-password" type="password" placeholder="New Password" />
+            <input id="reset-confirm-password" type="password" placeholder="Confirm New Password" />
+            <div class="modal-buttons">
+                <button id="cancel-reset">Cancel</button>
+                <button id="request-reset-code">Request Code</button>
+                <button id="submit-reset" style="display: none;">Reset Password</button>
+            </div>
+            <p id="reset-status"></p>
         </div>
     </div>
 

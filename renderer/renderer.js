@@ -17,6 +17,16 @@ function subscribeToRooms() {
     socket.on('room-created', function(room) {
         loadRooms();
     });
+
+    socket.on('friend-request-received', function(data) {
+        loadFriendRequests();
+        showNotification('Friend request from ' + data.from);
+    });
+
+    socket.on('friend-accepted', function(data) {
+        loadFriends();
+        showNotification(data.username + ' accepted your friend request');
+    });
 }
 
 window.subscribeToRooms = subscribeToRooms;
@@ -94,6 +104,8 @@ let selectedUsers = [];
 async function loadUsersForRoom() {
     const res = await fetch(API_BASE + '/users', { credentials: 'include' });
     const users = await res.json();
+    const friendsRes = await fetch(API_BASE + '/friends', { credentials: 'include' });
+    const friends = await friendsRes.json();
     const username = window.getUsername();
     selectedUsers = [];
     
@@ -101,7 +113,7 @@ async function loadUsersForRoom() {
     userBoxes.innerHTML = '';
     
     users.forEach(function(user) {
-        if (user !== username) {
+        if (user !== username && friends.includes(user)) {
             const box = document.createElement('div');
             box.className = 'user-box';
             box.textContent = user;
@@ -117,6 +129,10 @@ async function loadUsersForRoom() {
             userBoxes.appendChild(box);
         }
     });
+    
+    if (userBoxes.innerHTML === '') {
+        userBoxes.innerHTML = '<p style="color: #666;">No friends yet. Add friends first to create chats.</p>';
+    }
 }
 
 function handleCreateRoom() {
@@ -351,3 +367,162 @@ document.getElementById('input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') sendMessage();
 });
 document.getElementById('input').addEventListener('input', handleTyping);
+
+function showNotification(message) {
+    const notif = document.createElement('div');
+    notif.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #0066cc; color: white; padding: 15px 20px; border-radius: 5px; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3);';
+    notif.textContent = message;
+    document.body.appendChild(notif);
+    setTimeout(function() {
+        notif.remove();
+    }, 3000);
+}
+
+function openFriendsPanel() {
+    loadFriendRequests();
+    loadFriends();
+    document.getElementById('friends-panel').style.display = 'flex';
+}
+
+function closeFriendsPanel() {
+    document.getElementById('friends-panel').style.display = 'none';
+}
+
+function openAddFriendModal() {
+    document.getElementById('add-friend-modal').style.display = 'flex';
+    document.getElementById('friend-username-input').value = '';
+}
+
+function closeAddFriendModal() {
+    document.getElementById('add-friend-modal').style.display = 'none';
+}
+
+async function loadFriendRequests() {
+    const res = await fetch(API_BASE + '/friend-requests', { credentials: 'include' });
+    const requests = await res.json();
+    const list = document.getElementById('friend-requests-list');
+    list.innerHTML = '';
+
+    if (requests.length === 0) {
+        list.innerHTML = '<p style="color: #666;">No pending friend requests</p>';
+        return;
+    }
+
+    requests.forEach(function(req) {
+        const div = document.createElement('div');
+        div.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee;';
+        div.innerHTML = '<span>' + req.from + '</span>' +
+            '<div style="display: flex; gap: 10px;">' +
+            '<button class="accept-friend-btn" data-from="' + req.from + '" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">&#10003;</button>' +
+            '<button class="reject-friend-btn" data-from="' + req.from + '" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">&#10005;</button>' +
+            '</div>';
+        list.appendChild(div);
+    });
+
+    document.querySelectorAll('.accept-friend-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            acceptFriendRequest(this.getAttribute('data-from'));
+        });
+    });
+
+    document.querySelectorAll('.reject-friend-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            rejectFriendRequest(this.getAttribute('data-from'));
+        });
+    });
+}
+
+async function loadFriends() {
+    const res = await fetch(API_BASE + '/friends', { credentials: 'include' });
+    const friends = await res.json();
+    const list = document.getElementById('friends-list');
+    list.innerHTML = '';
+
+    if (friends.length === 0) {
+        list.innerHTML = '<p style="color: #666;">No friends yet</p>';
+        return;
+    }
+
+    friends.forEach(function(friend) {
+        const div = document.createElement('div');
+        div.style.cssText = 'padding: 10px; border-bottom: 1px solid #eee;';
+        div.textContent = friend;
+        list.appendChild(div);
+    });
+}
+
+async function sendFriendRequest() {
+    const to = document.getElementById('friend-username-input').value.trim();
+    if (!to) {
+        alert('Please enter a username');
+        return;
+    }
+
+    const res = await fetch(API_BASE + '/friend-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: to }),
+        credentials: 'include'
+    });
+
+    const data = await res.json();
+    if (data.success) {
+        alert('Friend request sent!');
+        closeAddFriendModal();
+    } else {
+        alert(data.error || 'Failed to send friend request');
+    }
+}
+
+async function acceptFriendRequest(from) {
+    const res = await fetch(API_BASE + '/friend-request/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: from }),
+        credentials: 'include'
+    });
+
+    const data = await res.json();
+    if (data.success) {
+        loadFriendRequests();
+        loadFriends();
+        showNotification('You are now friends with ' + from);
+    } else {
+        alert(data.error || 'Failed to accept friend request');
+    }
+}
+
+async function rejectFriendRequest(from) {
+    const res = await fetch(API_BASE + '/friend-request/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: from }),
+        credentials: 'include'
+    });
+
+    const data = await res.json();
+    if (data.success) {
+        loadFriendRequests();
+    } else {
+        alert(data.error || 'Failed to reject friend request');
+    }
+}
+
+document.getElementById('friends-tab-btn').addEventListener('click', openFriendsPanel);
+document.getElementById('close-friends-btn').addEventListener('click', closeFriendsPanel);
+document.getElementById('add-friend-btn').addEventListener('click', openAddFriendModal);
+document.getElementById('cancel-add-friend').addEventListener('click', closeAddFriendModal);
+document.getElementById('confirm-add-friend').addEventListener('click', sendFriendRequest);
+
+document.getElementById('friends-panel').addEventListener('click', function(e) {
+    if (e.target === this) closeFriendsPanel();
+});
+document.getElementById('add-friend-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeAddFriendModal();
+});
+
+window.showNotification = showNotification;
+window.openFriendsPanel = openFriendsPanel;
+window.loadFriendRequests = loadFriendRequests;
+window.loadFriends = loadFriends;
+window.initAuth = initAuth;
