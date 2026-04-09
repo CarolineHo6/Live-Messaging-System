@@ -131,7 +131,7 @@ async function loadUsersForRoom() {
     });
     
     if (userBoxes.innerHTML === '') {
-        userBoxes.innerHTML = '<p style="color: #666;">No friends yet. Add friends first to create chats.</p>';
+        userBoxes.innerHTML = '<p style="color: #64748b;">No friends yet. Add friends first to create chats.</p>';
     }
 }
 
@@ -370,11 +370,14 @@ document.getElementById('input').addEventListener('input', handleTyping);
 
 function showNotification(message) {
     const notif = document.createElement('div');
-    notif.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #0066cc; color: white; padding: 15px 20px; border-radius: 5px; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3);';
+    notif.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 16px 24px; border-radius: 12px; z-index: 1000; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4); font-weight: 500;';
     notif.textContent = message;
     document.body.appendChild(notif);
     setTimeout(function() {
-        notif.remove();
+        notif.style.opacity = '0';
+        notif.style.transform = 'translateY(-10px)';
+        notif.style.transition = 'all 0.3s ease';
+        setTimeout(function() { notif.remove(); }, 300);
     }, 3000);
 }
 
@@ -404,17 +407,17 @@ async function loadFriendRequests() {
     list.innerHTML = '';
 
     if (requests.length === 0) {
-        list.innerHTML = '<p style="color: #666;">No pending friend requests</p>';
+        list.innerHTML = '<p style="color: #64748b; padding: 20px; text-align: center;">No pending friend requests</p>';
         return;
     }
 
     requests.forEach(function(req) {
         const div = document.createElement('div');
-        div.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee;';
-        div.innerHTML = '<span>' + req.from + '</span>' +
-            '<div style="display: flex; gap: 10px;">' +
-            '<button class="accept-friend-btn" data-from="' + req.from + '" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">&#10003;</button>' +
-            '<button class="reject-friend-btn" data-from="' + req.from + '" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">&#10005;</button>' +
+        div.className = 'friend-request-item';
+        div.innerHTML = '<span style="font-weight: 500;">' + req.from + '</span>' +
+            '<div style="display: flex; gap: 8px;">' +
+            '<button class="accept-friend-btn" data-from="' + req.from + '">&#10003;</button>' +
+            '<button class="reject-friend-btn" data-from="' + req.from + '">&#10005;</button>' +
             '</div>';
         list.appendChild(div);
     });
@@ -439,13 +442,13 @@ async function loadFriends() {
     list.innerHTML = '';
 
     if (friends.length === 0) {
-        list.innerHTML = '<p style="color: #666;">No friends yet</p>';
+        list.innerHTML = '<p style="color: #64748b; padding: 20px; text-align: center;">No friends yet</p>';
         return;
     }
 
     friends.forEach(function(friend) {
         const div = document.createElement('div');
-        div.style.cssText = 'padding: 10px; border-bottom: 1px solid #eee;';
+        div.className = 'friend-item';
         div.textContent = friend;
         list.appendChild(div);
     });
