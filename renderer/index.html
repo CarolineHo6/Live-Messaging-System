@@ -15,6 +15,7 @@
         <input id="auth-username" placeholder="Username" />
         <input id="auth-password" type="password" placeholder="Password" />
         <input id="auth-confirm" type="password" placeholder="Confirm Password" style="display: none;" />
+        <input id="auth-email" type="email" placeholder="Email (optional)" style="display: none;" />
         <button id="auth-submit">Done</button>
         <p id="auth-switch">Don't have an account? <a href="#" id="switch-link">Create one</a></p>
         <p id="forgot-password"><a href="#" id="forgot-password-link">Forgot Password?</a></p>
@@ -39,6 +40,7 @@
             <h3>Rooms</h3>
             <div id="room-list"></div>
             <button id="open-create-room">+ New Room</button>
+            <button id="profile-tab-btn" style="margin-top: auto;">Profile</button>
         </div>
         <div id="main">
             <div id="chat-header">
@@ -103,6 +105,19 @@
                 <button id="cancel-add-friend">Cancel</button>
                 <button id="confirm-add-friend">Send Request</button>
             </div>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <h2>Profile Settings</h2>
+            <input id="profile-email" type="email" placeholder="Your email" />
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Add an email to enable password reset</p>
+            <div class="modal-buttons">
+                <button id="cancel-profile">Close</button>
+                <button id="save-profile">Save</button>
+            </div>
+            <p id="profile-status"></p>
         </div>
     </div>
 

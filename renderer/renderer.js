@@ -562,3 +562,193 @@ window.openFriendsPanel = openFriendsPanel;
 window.loadFriendRequests = loadFriendRequests;
 window.loadFriends = loadFriends;
 window.initAuth = initAuth;
+
+const forgotPasswordLink = document.getElementById('forgot-password-link');
+const forgotPasswordModal = document.getElementById('forgot-password-modal');
+const cancelResetBtn = document.getElementById('cancel-reset');
+const requestResetCodeBtn = document.getElementById('request-reset-code');
+const submitResetBtn = document.getElementById('submit-reset');
+const resetStatus = document.getElementById('reset-status');
+
+if (forgotPasswordLink) {
+    forgotPasswordLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        forgotPasswordModal.style.display = 'flex';
+        resetStatus.textContent = '';
+        resetStatus.style.color = '';
+        document.getElementById('reset-username').value = '';
+        document.getElementById('reset-code').value = '';
+        document.getElementById('reset-new-password').value = '';
+        document.getElementById('reset-confirm-password').value = '';
+        document.getElementById('reset-code').style.display = 'block';
+        document.getElementById('reset-new-password').style.display = 'block';
+        document.getElementById('reset-confirm-password').style.display = 'block';
+        requestResetCodeBtn.style.display = 'inline-block';
+        submitResetBtn.style.display = 'none';
+    });
+}
+
+if (cancelResetBtn) {
+    cancelResetBtn.addEventListener('click', function() {
+        forgotPasswordModal.style.display = 'none';
+    });
+}
+
+if (forgotPasswordModal) {
+    forgotPasswordModal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+}
+
+if (requestResetCodeBtn) {
+    requestResetCodeBtn.addEventListener('click', async function() {
+        const username = document.getElementById('reset-username').value.trim();
+        if (!username) {
+            resetStatus.textContent = 'Please enter your username';
+            resetStatus.style.color = 'var(--danger)';
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:3000/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                resetStatus.textContent = 'Reset code sent to your email!';
+                resetStatus.style.color = 'var(--success)';
+                document.getElementById('reset-code').style.display = 'block';
+                document.getElementById('reset-new-password').style.display = 'block';
+                document.getElementById('reset-confirm-password').style.display = 'block';
+                requestResetCodeBtn.style.display = 'none';
+                submitResetBtn.style.display = 'inline-block';
+            } else {
+                resetStatus.textContent = data.error || 'Failed to request reset code';
+                resetStatus.style.color = 'var(--danger)';
+            }
+        } catch (err) {
+            resetStatus.textContent = 'Error connecting to server';
+            resetStatus.style.color = 'var(--danger)';
+        }
+    });
+}
+
+if (submitResetBtn) {
+    submitResetBtn.addEventListener('click', async function() {
+        const username = document.getElementById('reset-username').value.trim();
+        const code = document.getElementById('reset-code').value.trim();
+        const newPassword = document.getElementById('reset-new-password').value;
+        const confirmPassword = document.getElementById('reset-confirm-password').value;
+
+        if (!username || !code || !newPassword) {
+            resetStatus.textContent = 'Please fill in all fields';
+            resetStatus.style.color = 'var(--danger)';
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            resetStatus.textContent = 'Passwords do not match';
+            resetStatus.style.color = 'var(--danger)';
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            resetStatus.textContent = 'Password must be at least 6 characters';
+            resetStatus.style.color = 'var(--danger)';
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:3000/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, code: code, newPassword: newPassword })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                resetStatus.textContent = 'Password reset successful!';
+                resetStatus.style.color = 'var(--success)';
+                setTimeout(function() {
+                    forgotPasswordModal.style.display = 'none';
+                }, 1500);
+            } else {
+                resetStatus.textContent = data.error || 'Failed to reset password';
+                resetStatus.style.color = 'var(--danger)';
+            }
+        } catch (err) {
+            resetStatus.textContent = 'Error connecting to server';
+            resetStatus.style.color = 'var(--danger)';
+        }
+    });
+}
+
+const profileTabBtn = document.getElementById('profile-tab-btn');
+const profileModal = document.getElementById('profile-modal');
+const profileStatus = document.getElementById('profile-status');
+
+if (profileTabBtn) {
+    profileTabBtn.addEventListener('click', async function() {
+        const res = await fetch('http://localhost:3000/me', { credentials: 'include' });
+        const data = await res.json();
+        if (data.username) {
+            const userRes = await fetch('http://localhost:3000/user/' + data.username, { credentials: 'include' });
+            const userData = await userRes.json();
+            document.getElementById('profile-email').value = userData.email || '';
+        }
+        profileStatus.textContent = '';
+        profileModal.style.display = 'flex';
+    });
+}
+
+if (document.getElementById('cancel-profile')) {
+    document.getElementById('cancel-profile').addEventListener('click', function() {
+        profileModal.style.display = 'none';
+    });
+}
+
+if (profileModal) {
+    profileModal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+}
+
+if (document.getElementById('save-profile')) {
+    document.getElementById('save-profile').addEventListener('click', async function() {
+        const email = document.getElementById('profile-email').value.trim();
+        
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            profileStatus.textContent = 'Invalid email format';
+            profileStatus.style.color = 'var(--danger)';
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:3000/update-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email }),
+                credentials: 'include'
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                profileStatus.textContent = 'Profile updated!';
+                profileStatus.style.color = 'var(--success)';
+            } else {
+                profileStatus.textContent = data.error || 'Failed to update profile';
+                profileStatus.style.color = 'var(--danger)';
+            }
+        } catch (err) {
+            profileStatus.textContent = 'Error connecting to server';
+            profileStatus.style.color = 'var(--danger)';
+        }
+    });
+}

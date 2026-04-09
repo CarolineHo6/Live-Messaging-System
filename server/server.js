@@ -10,9 +10,18 @@ const bcrypt = require('bcryptjs');
 const xss = require('xss');
 const crypto = require('crypto');
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 const allowedOrigins = isProduction 
@@ -167,7 +176,7 @@ function requireAuth(req, res, next) {
 }
 
 app.post('/signup', authLimiter, async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, email } = req.body;
 
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password required' });
@@ -186,8 +195,20 @@ app.post('/signup', authLimiter, async (req, res) => {
         return res.status(400).json({ error: 'Username already taken' });
     }
 
+    if (email) {
+        const existingEmail = await db.collection('users').findOne({ email: email.toLowerCase() });
+        if (existingEmail) {
+            return res.status(400).json({ error: 'Email already associated with an account' });
+        }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
-    const user = { username, password: hashedPassword, createdAt: new Date() };
+    const user = { 
+        username, 
+        password: hashedPassword, 
+        email: email ? email.toLowerCase() : null,
+        createdAt: new Date() 
+    };
     await db.collection('users').insertOne(user);
 
     req.session.userId = username;
@@ -231,15 +252,29 @@ app.post('/forgot-password', async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
     }
 
+    if (!user.email) {
+        return res.status(400).json({ error: 'No email associated with this account. Please contact support.' });
+    }
+
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     passwordResetCodes.set(sanitize(username), {
         code,
+        email: user.email,
         expiresAt: Date.now() + RESET_CODE_EXPIRY
     });
 
-    console.log('Password reset code for ' + username + ': ' + code);
-
-    res.json({ success: true, message: 'Reset code sent to your email (code logged for demo)' });
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: user.email,
+            subject: 'Password Reset Code',
+            text: `Your password reset code is: ${code}\n\nThis code will expire in 15 minutes.`
+        });
+        res.json({ success: true, message: 'Reset code sent to your email' });
+    } catch (error) {
+        console.error('Email error:', error);
+        res.status(500).json({ error: 'Failed to send reset email' });
+    }
 });
 
 app.post('/reset-password', async (req, res) => {
@@ -284,6 +319,36 @@ app.get('/me', (req, res) => {
     } else {
         res.status(401).json({ error: 'Not authenticated' });
     }
+});
+
+app.get('/user/:username', requireAuth, async (req, res) => {
+    const user = await db.collection('users').findOne({ username: sanitize(req.params.username) });
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ username: user.username, email: user.email || '' });
+});
+
+app.post('/update-email', requireAuth, async (req, res) => {
+    const { email } = req.body;
+    const username = req.session.userId;
+
+    if (email) {
+        const existing = await db.collection('users').findOne({ 
+            email: email.toLowerCase(),
+            username: { $ne: username }
+        });
+        if (existing) {
+            return res.status(400).json({ error: 'Email already associated with another account' });
+        }
+    }
+
+    await db.collection('users').updateOne(
+        { username },
+        { $set: { email: email ? email.toLowerCase() : null } }
+    );
+
+    res.json({ success: true });
 });
 
 app.get('/users', requireAuth, async (req, res) => {

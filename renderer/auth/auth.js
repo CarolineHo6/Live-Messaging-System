@@ -11,15 +11,18 @@ function setSignupMode(value) {
 function updateAuthUI() {
     const title = document.getElementById('auth-title');
     const confirmInput = document.getElementById('auth-confirm');
+    const emailInput = document.getElementById('auth-email');
     const switchText = document.getElementById('auth-switch');
 
     if (isSignupMode) {
         title.textContent = 'Sign Up';
         confirmInput.style.display = 'block';
+        emailInput.style.display = 'block';
         switchText.innerHTML = 'Already have an account? <a href="#" id="switch-link">Log in</a>';
     } else {
         title.textContent = 'Login';
         confirmInput.style.display = 'none';
+        emailInput.style.display = 'none';
         switchText.innerHTML = "Don't have an account? <a href=\"#\" id=\"switch-link\">Create one</a>";
     }
 }
@@ -43,9 +46,10 @@ async function handleSignup() {
     const usernameVal = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value;
     const confirm = document.getElementById('auth-confirm').value;
+    const email = document.getElementById('auth-email').value.trim();
 
     if (!usernameVal || !password) {
-        alert('Please fill in all fields');
+        alert('Please fill in all required fields');
         return;
     }
 
@@ -57,7 +61,7 @@ async function handleSignup() {
     const res = await fetch('http://localhost:3000/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: usernameVal, password })
+        body: JSON.stringify({ username: usernameVal, password, email: email || null })
     });
 
     const data = await res.json();
