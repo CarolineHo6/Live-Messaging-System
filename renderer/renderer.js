@@ -348,6 +348,39 @@ function updateTypingIndicator() {
 window.initAuth();
 document.getElementById('auth-submit').addEventListener('click', window.handleAuthSubmit);
 
+const themeBtn = document.getElementById('theme-btn');
+const themeMenu = document.getElementById('theme-menu');
+
+themeBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    themeBtn.classList.toggle('active');
+    themeMenu.classList.toggle('show');
+});
+
+document.addEventListener('click', function() {
+    themeBtn.classList.remove('active');
+    themeMenu.classList.remove('show');
+});
+
+themeMenu.querySelectorAll('button').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const theme = this.getAttribute('data-theme');
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        themeMenu.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        themeBtn.classList.remove('active');
+        themeMenu.classList.remove('show');
+    });
+});
+
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeMenu.querySelector('[data-theme="' + savedTheme + '"]')?.classList.add('active');
+}
+
 document.getElementById('auth-username').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') window.handleAuthSubmit();
 });
